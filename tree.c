@@ -13,7 +13,7 @@
  #include <sys/types.h> /* pid */
  #include <sys/wait.h> /* waitpid() */
 
-enum infinity {inf2 = 10000001, inf1 = 10000000};
+enum  {inf2 = 10000001, inf1 = 10000000};
 
 enum { CLEAN = 0, MARKED = 1, IFLAG = 2, DFLAG = 3 };
 
@@ -82,17 +82,10 @@ int *get_ptr(info *pointer) {
   intptr_t temp = (intptr_t) pointer;
   temp ^= (0 ^ temp) & (1 << 0);
   temp ^= (0 ^ temp) & (1 << 1);
-  return temp;
+  return (int*) temp;
 }
 
 
-void help(info *op) {
-  int flag = get_state(op);
-  if (flag == IFLAG) { help_insert(op); }
-  if (flag == MARKED) { help_marked(op); }
-  if (flag == DFLAG) { help_delete(op); }
-}
-      
 int max(int x, int y) {
   if (x > y) { return x;} else { return y; }
 }     
@@ -152,9 +145,19 @@ void help_marked(info *op) {
   node *other;
   if (op->parent->right == op->leaf) { other = op->parent->left; }
   else { other = op->parent->right; }
+  CAS_child(op->grand_parent, op->parent, other);
+  __sync_bool_compare_and_swap(&(op->grand_parent->info), set_state(op, DFLAG), set_state(op, DFLAG));
+}
   // Set other to point to the sibling of the node to which op->leaf points
   
 
+void help(info *op) {
+int flag = get_state(op);
+if (flag == IFLAG) { help_insert(op); }
+  if (flag == MARKED) { help_marked(op); }
+  if (flag == DFLAG) { help_delete(op); }
+}
+      
 
 int insert(int key, node *root) {
   node *parent, *new_internal;
@@ -162,14 +165,14 @@ int insert(int key, node *root) {
   node *new = malloc(sizeof(node));
   new->key = key;
   new->is_leaf = 1;
-  info pinfo, result;
+  info *result;
   //info *op;
       
   while(1) {
     search_return search_result = search(key, root);
     node *leaf = search_result.leaf;
     node *parent = search_result.parent;
-    info pinfo = search_result.pinfo;
+    info *pinfo = search_result.pinfo;
       
     if (leaf->key == key) { return 0; }
     int mark = get_state(pinfo);
@@ -183,8 +186,8 @@ int insert(int key, node *root) {
       new_internal = malloc(sizeof(node));
       new_internal->is_leaf = 0;
       new_internal->key = max(key, leaf->key);
-      (new_internal->info).info = malloc(sizeof(info));
-      (new_internal->info).info = set_state((new_internal->info).info, CLEAN);
+      (new_internal->info) = malloc(sizeof(info));
+      (new_internal->info) = set_state((new_internal->info), CLEAN);
       
       if (new->key < new_sibling->key) {
       	new_internal->left = new; new_internal->right = new_sibling; } else {
@@ -192,19 +195,20 @@ int insert(int key, node *root) {
       
       info *op = malloc(sizeof(info));
       op->type = INSERT;
-      op->p = parent;
+      op->parent = parent;
       op->leaf = leaf;
-      op->new_internal = new_internal;
+      op->new_internal = new_internal; // New "parent" replacing a leaf
       
-      if (__sync_bool_compare_and_swap(&(parent->info), pinfo, set_state(op, IFLAG))) {
-      	help_insert(op);
-      	return 1;
-      } else { help(result); }
+      result = __sync_val_compare_and_swap(&(parent->info), pinfo, set_state(op, IFLAG));
+      if (result == pinfo) {
+	help_insert(op);
+	return 1; }
+      else { help(result); }
     } 
   }   
 }     
       	
-CAS_child(node *parent, node *old, node* new) {
+void CAS_child(node *parent, node *old, node* new) {
   //Precond: parent points to an internal node and new points to a Node.
   //This function tries to change one of the child fields of the node that parents points to from old to new
   if (new->key < parent->key) {
