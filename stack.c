@@ -42,17 +42,17 @@ int enqueue(queue *Q, int val) {
     while(1) {
     tail = Q->tail;
     next = tail->next;
-    if (tail == Q->tail) {
-      if (next == NULL) {
+    if (tail == Q->tail) { // True = not falling behind
+      if (next == NULL) { // Next should be NULL
 	if (__sync_bool_compare_and_swap(&tail->next, next, new_node)) {
 	  break;
 	}
-      } else {
+      } else { // Tail falling behind, move it forward
 	__sync_bool_compare_and_swap(&Q->tail, tail, next);
       }
-    }
+    } 
   }
-  __sync_bool_compare_and_swap(&Q->tail, tail, new_node);
+    __sync_bool_compare_and_swap(&Q->tail, tail, new_node); // Attempt to move tail forward
   return 1;
 }
 
@@ -67,10 +67,10 @@ int dequeue(queue *Q, int *pvalue) {
 	if (next == NULL) {
 	  return 0; //Queue is empty
 	}
-	__sync_bool_compare_and_swap(&Q->tail, tail, next);
+	__sync_bool_compare_and_swap(&Q->tail, tail, next); // Tail is falling behind
       } else {
 	*pvalue = next->value;
-	if (__sync_bool_compare_and_swap(&Q->head, head, next)) {
+	if (__sync_bool_compare_and_swap(&Q->head, head, next)) { //Move head forward
 	  break;
 	}
       }
