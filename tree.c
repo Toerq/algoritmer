@@ -138,12 +138,12 @@ void help_insert(info *op) {
 int help_delete(info *op) {
   info *op_ptr = get_ptr(op);
   info *result = __sync_val_compare_and_swap(&(op_ptr->parent->info), op_ptr->pinfo, set_state(op, MARKED)); //Mark parent
-  if (result == op_ptr->pinfo || op_ptr->parent->info == set_state(op_ptr->parent->info, MARKED)) { //op-parent successfully marked
+  if (result == op_ptr->pinfo || result == set_state(op_ptr->parent->info, MARKED)) { //op-parent successfully marked
     help_marked(op); // Complete the deletion
     return 1;
   } else {
     help(result);
-    __sync_bool_compare_and_swap(&(op_ptr->parent->info), set_state(op, DFLAG), set_state(op, CLEAN)); //Backtrack
+    __sync_bool_compare_and_swap(&(op_ptr->grand_parent->info), set_state(op, DFLAG), set_state(op, CLEAN)); //Backtrack
     return 0;
   }
 }
@@ -195,7 +195,7 @@ int delete(int key, node *root) {
       info *result = __sync_val_compare_and_swap(&(grand_parent->info), gpinfo, set_state(op, DFLAG));
       if (result == gpinfo) {
 	if (help_delete(op)) { return 1; }
-	else { 			printf("Delete collision!\n");
+	else { 		//	printf("Delete collision!\n");
 	  help(result); }
       }
     }
@@ -250,10 +250,11 @@ int insert(int key, node *root) {
 	help_insert(op);
 	return 1; }
       else {
-	printf("Insert collision!\n");
+	//	printf("Insert collision!\n");
 	int flag = get_state((unsigned int) parent->info);
 	if(flag != 0) {
-	  printf("Flag in insert collision: %d", flag); }
+	  //  printf("Flag in insert collision: %d", flag);
+	}
 	help(result); }
     } 
   }   
@@ -300,10 +301,10 @@ void *insertion_1(void *root_) {
   pthread_t Q = pthread_self();
   int P = (int) Q;
   int prev = 0;
-  for(int i = 0; i < 1; i++) {
+  for(int i = 0; i < 4000; i++) {
     int r = rand()/100000;
     int val = r;
-    if (r % 2 == 1) {
+    if (rand() % 2 == 1) {
       int result = insert(val, root); 
       if (result == 1) {
 	result = find(val, root);
@@ -314,7 +315,7 @@ void *insertion_1(void *root_) {
     }  else {
       int exists_before = find(val, root);
       int result = delete(val, root);
-      if (result == 0) printf("delete returned 0");
+      //     if (result == 0) printf("delete returned 0");
       int exists_after = find(val, root);
       if(exists_before == exists_after && exists_before == 1) {
 	printf("deletion failed: %d\n", result);
@@ -327,7 +328,7 @@ void *insertion_1(void *root_) {
 
 void *insertion_2(void *root_) {
   node *root = (node*) root_;
-  for(int i = 0; i < 10000; i++) {
+  for(int i = 0; i < 1000; i++) {
     insert(i, root);
   }
   return NULL;
@@ -335,7 +336,7 @@ void *insertion_2(void *root_) {
 
 void *insertion_3(void *root_) {
   node *root = (node*) root_;
-  for(int i = 0; i < 10000; i++) {
+  for(int i = 0; i < 1000; i++) {
     delete(i, root);
   }
   return NULL;
@@ -362,13 +363,14 @@ int main() {
   
   node *root = init();
   // insertion((void*)root);
-
-  pthread_create(&thread0, NULL, insertion_3, root);
-  pthread_create(&thread1, NULL, insertion_3, root);
-  pthread_create(&thread2, NULL, insertion_3, root);
-  pthread_create(&thread3, NULL, insertion_3, root);
-  pthread_create(&thread4, NULL, insertion_2, root);
-  pthread_create(&thread5, NULL, insertion_2, root);
+  int i = 1;
+  while(1) {
+  pthread_create(&thread0, NULL, insertion_1, root);
+  pthread_create(&thread1, NULL, insertion_1, root);
+  pthread_create(&thread2, NULL, insertion_1, root);
+  pthread_create(&thread3, NULL, insertion_1, root);
+  pthread_create(&thread4, NULL, insertion_1, root);
+  pthread_create(&thread5, NULL, insertion_1, root);
   // //
   pthread_join(thread0, NULL);
   pthread_join(thread1, NULL);
@@ -377,6 +379,9 @@ int main() {
   pthread_join(thread4, NULL);  
   pthread_join(thread5, NULL);
   //      print_tree(root);
+  if (i++ % 100 == 0) {
+    printf("%d\n",i); }
+  }
       insert(5,root);
       delete(4,root);
       insert(6,root);
