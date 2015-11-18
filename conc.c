@@ -51,6 +51,8 @@ void *f2(void *p_) {
 int main() {
   pair *p = malloc(sizeof(pair));
   int count = 0;
+  int count_x = 0;
+  int count_y = 0;
   while(1) {
     pthread_t thread0;
     pthread_t thread1;
@@ -69,10 +71,23 @@ int main() {
 
     
     if (p->result_x && p->result_y) {
-      printf("^"); 
+      //      printf("^");
+      printf("Reodering count: %d\n", count); 
+      printf("x only count: %d\n", count_x);
+      printf("y only count: %d\n", count_y);
+            
       count++;
-      //printf(", count: %d\n", count); 
-    } 
+      count_x = 0;
+      count_y = 0;
+    } else if (p->result_x) {
+      count_x++;
+    } else if (p->result_y) {
+      count_y++;
+    }
   }
-    return 1;
+  return 1;
 }
+
+/*
+  gcc -lpthread -pthread -Wall -std=c11 conc.c -o conc
+*/
