@@ -1,0 +1,210 @@
+embed
+
+  #define FOO 42
+  #include <stdio.h> 
+  #include <stdlib.h>
+  #include <sys/types.h>
+  #include <pthread.h>
+  #include <stdio.h> 
+  #include <stdint.h>
+
+  //
+  #include <sys/types.h> /* pid */
+  #include <sys/wait.h> /* waitpid() */
+
+  #define CAT(a,b,c) {__sync_bool_compare_and_swap(&a,b,c); c = NULL; }
+end
+
+
+    
+
+def CAT(a : Node, b : Node, c : Node) : Node
+  embed Node
+    int ret = __sync_bool_compare_and_swap(&#{a},#{b},#{c});
+    #{a};
+  end
+
+unsafe trait HasNext
+    require next : Node
+    def getNext_() : Node
+      this.next
+    
+unsafe trait HasValue
+      require value : int
+      def getVal() : int
+	this.value
+
+passive class Node: HasNext * HasValue
+   next : Node
+   value : int
+
+passive class Queue
+  head : Node
+  tail : Node
+  def init() : void {
+   let initNode = new Node
+   in {
+    this.head = initNode;
+    this.tail = initNode;
+    initNode.value = -1;
+   }
+}
+ 
+ 
+  def Dequeue() : int
+    let head = null : Node -- borrowed (Node) -- Stack bound, får ej spara på heapen
+	tail = null : Node
+	old_val = null : Node
+	next = null : Node
+	newHead = null : HasNext
+	returnVal = 1 : int
+	--newHead = null : HasNext
+	result = null : HasValue -- : HasValue
+    in {
+      while(true) {
+      --     print(this.head);
+      --     print("\n");
+      embed void
+	fflush(stdout);
+      end;
+	head = this.head; -- Speculate 
+	tail = this.tail;
+	next = head.next; -- Next is stymied
+	if (head == this.head) then {
+--               print("1");
+          if (head == tail) then {
+--               print("2");
+            if (next == null) then {
+--	           print("Queue is empty\n");
+              returnVal = -1;
+              embed void
+	       break;
+              end
+            };
+             --     print("4");
+	    old_val = this.tail;
+            this.tail = CAT(this.tail, tail, next);  -- tail is falling behind
+	    if(this.tail != old_val) then { -- CAS succeeded 
+       ();
+             --  next = null; ()
+	       }
+          } else {
+--	      newHead = next;
+	      result = next; -- result is stymied (should be consume next)
+              old_val = this.head;
+--	      print(next.value);
+--              print("\n");
+              this.head = CAT(this.head, head, next);
+	      if (this.head != old_val) then {
+                 next = null;
+       -- reading result.value is illegal, something similar to newHead + result = consume next; needs to be done.
+	        returnVal = result.getVal(); -- Should return something that indicates if the CAT succeeded or not.
+                embed void
+		  break;
+                end
+              } 
+          }
+        }
+      };
+      returnVal;							      
+     }
+
+
+  def Enqueue(value : int) : int
+    let
+      NewNode = new Node
+      head = this.head : Node
+      tail = this.tail : Node
+      next = null : Node
+      old_val = null : Node
+    in {
+--      print("Enqueue\n");
+      NewNode.next = null;
+      NewNode.value = value;
+     while(true) {
+       tail = this.tail;
+       next = tail.next;
+       if (tail == this.tail) then {
+--	 print("1\n");
+	 if (next == null) then {
+--           print("2\n");
+	   old_val = tail.next;
+           tail.next = CAT(tail.next, next, NewNode);
+	   if (tail.next != old_val) then {
+              NewNode = null;
+--	      print(next);
+--	 print("3\n");
+            embed void
+	      break;
+            end
+	    
+           }
+         } else {
+	   old_val = this.tail;
+	   this.tail = CAT(this.tail, tail, next); --() -- Tail falling behind
+           if(this.tail != old_val) then {
+	     next = null;
+           }
+         }
+    };
+--	print("4\n");
+    old_val = this.tail;
+    this.tail = CAT(this.tail, tail, NewNode); -- Tail behind
+    if(this.tail != old_val) then {
+      NewNode = null;
+      };
+    1;
+   }
+}
+
+def Printer() : void {
+  let 
+    head = this.head : Node
+    in {
+    print("Head: ");
+    print(this.head);
+    print("\n");
+    print("Tail: ");
+    print(this.tail);
+    print("\n");
+  while(head.next != null) {
+    print(head.next.value);
+    head = head.next;
+    }
+}
+}
+
+
+class Worker
+  def start(q : Queue, i : int) : void {
+    for x in [1..10000] {
+      print("worker {} enqueueing {}\n", i, x);
+      q.Enqueue(x);
+      print("worker {} dequeued {}\n", i, q.Dequeue());
+      };
+       print("done {}\n", i) ;
+  }
+    
+
+class Main
+  def main() : void
+    let q = new Queue()
+	w1 = new Worker
+	w2 = new Worker
+	value_ = -1
+    in {
+    w1.start(q,1);  
+    w2.start(q,2); 
+ }
+
+
+
+     
+     
+
+
+
+
+
+
+
