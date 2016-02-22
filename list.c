@@ -1,5 +1,6 @@
 //typedef struct node node, pointer pointer;
 
+#include <pthread.h>
 #include <stdio.h> /* I/O functions: printf() ... */
 #include <stdlib.h> /* rand(), srand() */
 #include <unistd.h> /* read(), write() calls */
@@ -45,11 +46,14 @@ node *get_unmarked_reference(node *node) {
   return temp;
 }
 
-list init() {
+list *init() {
   node *head = malloc(sizeof(node));//{0, NULL};
   node *tail = malloc(sizeof(node));//{0, NULL};
   head->next = tail;
-  list new_list = {head, tail};
+  list *new_list = malloc(sizeof(list));
+  new_list->head = head;
+  new_list->tail = tail;
+
   head->key = -1;
   tail->key = -2;
   return new_list;
@@ -65,17 +69,16 @@ int insert(list *list, int key) {
     right_node = search(list, key, &left_node_ref);
     left_node = (node*) left_node_ref;
     if ((right_node != list->tail) && (right_node->key == key)) { //Only unique values
-      free(new_node);
+      //            free(new_node);
       return 0;
     }
     new_node->next = right_node;
   } while (__sync_bool_compare_and_swap(&left_node->next, right_node, new_node)); 
-    return 1;
+  return 1;
 }
 
 int delete(list *list, int search_key) {
   node *right_node, *right_node_next, *left_node, **left_node_ref;
-
   do {
     right_node = search(list, search_key, &left_node_ref);
     left_node = (node*) left_node_ref;
@@ -95,7 +98,7 @@ int delete(list *list, int search_key) {
 
   //Physical deletion
   if (!(__sync_bool_compare_and_swap(&(left_node->next), right_node, right_node_next))) {
-    right_node = search(list, right_node->key, left_node);
+    right_node = search(list, right_node->key, &left_node_ref);//left_node);
   }
   return 1;
 }
@@ -167,18 +170,103 @@ void print_function(list *list) {
   printf("adress: %d next: %d, key: %d\n",node, node->next,node->key);
 }
 
-int main() {
-  list list = init();
-  for(int i = 0; i < 10; i++) {
-    insert(&list, i);
+void *insertion_2(void *list_) {
+  while(1) {
   }
-  insert(&list, 11);
-  insert(&list, 10);
-  delete(&list, 5);
-  print_function(&list);
-  int q = 0;
-  q = find(&list, -1);
-  printf("%d\n", q);
+  //  printf("hello from thread %d", pthread_self());
+}
+
+void *insertion_1(void *list_) {
+  list *list = list_;
+  pthread_t Q = pthread_self();
+  int P = (int) Q;
+  int prev = 0;
+  time_t rawtime;
+  time (&rawtime);
+  srand(rawtime);
+  int fail_count = 0;
+  for(int i = 0; i < 400000; i++) {
+    int r = (rand() % 100) + 1;
+    int val = r;
+    if (rand() % 2 == 1) {
+      int result = insert(list, val); 
+      if (result == 1) {
+	result = find(list, val);
+	if(result != 1) {
+	  printf("Insertion succeeded but not in list\n");
+	  fail_count++;
+	}
+      }
+    }  else {
+      int exists_before = find(list, val);
+      int result = delete(list, val);
+      //     if (result == 0) printf("delete returned 0");
+      int exists_after = find(list, val);
+      if(exists_before == exists_after && exists_before == 1) {
+	printf("deletion failed: %d\n", result);
+	fail_count++;
+      }
+    }
+    int prev = val;
+  }
+  printf("\n Number of fails: %d", fail_count);
+  return NULL;
+}
+
+
+
+int main() {
+
+  list *list = init();
+
+  pthread_t thread0;
+  pthread_t thread1;
+  pthread_t thread2;
+  pthread_t thread3;
+  pthread_t thread4;
+  pthread_t thread5;
+  
+  // insertion((void*)root);
+  int i = 1;
+  pthread_create(&thread0, NULL, insertion_1, list);
+  pthread_create(&thread1, NULL, insertion_1, list);
+  pthread_create(&thread2, NULL, insertion_1, list);
+  pthread_create(&thread3, NULL, insertion_1, list);
+  pthread_create(&thread4, NULL, insertion_1, list);
+  pthread_create(&thread5, NULL, insertion_1, list);
+       
+  pthread_join(thread0, NULL);
+  pthread_join(thread1, NULL);
+  pthread_join(thread2, NULL);
+  pthread_join(thread3, NULL);  
+  pthread_join(thread4, NULL);  
+  pthread_join(thread5, NULL);
+  
+
+
+
+
+
+
+
+  //    int Q1 = 0;
+  //    int Q2 = 0;
+  //
+  //      for(int i = 0; i <10000000; i++) {
+  //	Q1 = rand();
+  //	Q2 = rand();
+  //	if(Q1%2==0)
+  //          insert(list, Q2);
+  //	else
+  //          delete(list, Q2);
+  //        }
+  //  insert(list, 11);
+  //  insert(list, 10);
+  //  delete(list, 5);
+  //  print_function(list);
+  //  int q = 0;
+  //  q = find(list, -1);
+  //  printf("%d\n", q);
   
   //  insert(&list, 4);
   //  insert(&list, 5);
