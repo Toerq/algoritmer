@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <pthread.h>
 #include <stdio.h> /* I/O functions: printf() ... */
 #include <stdlib.h> /* rand(), srand() */
@@ -133,21 +134,62 @@ int dequeue(queue *Q) {
   return 1;
 }
 
-void *insertion(void *queue_) {
+void *mix(void *queue_) {
   queue *Q = (queue*) queue_;
   //  int p = -1;
-  for(int i = 0; i < 1000000003; i++) {
-    if(i % 2 == 0) { enqueue(Q, i); } else {
-      dequeue(Q); }
+  for(int i = 0; i < 1000000; i++) {
+    if(i % 3 == 0) { dequeue(Q); } else {
+      enqueue(Q, i);
+    }
   }
   return NULL;
 }
 
 
+void *insertion(void *queue_) {
+  queue *Q = (queue*) queue_;
+  //  int p = -1;
+  for(int i = 0; i < 1000000; i++) {
+      enqueue(Q, i);
+  }
+  return NULL;
+}
+
+void *deletion(void *queue_) {
+  queue *Q = (queue*) queue_;
+  //  int p = -1;
+  for(int i = 0; i < 1000000; i++) {
+    dequeue(Q);
+  }
+  return NULL;
+}
+
+
+void *enqueue_(void *queue_) {
+  queue *Q = (queue*) queue_;
+  enqueue(Q, 42);
+  return NULL;
+}
+
+void *dequeue_(void *queue_) {
+  queue *Q = (queue*) queue_;
+  dequeue(Q);
+  return NULL;
+}
+
+
+
 int main() {
-  int thread_count = 8;
+  int thread_count = 32;
   pthread_t threads[thread_count];
   queue *Q = init();
+  pthread_create(&threads[0], NULL, enqueue_, Q);
+  pthread_create(&threads[1], NULL, dequeue_, Q);
+  for(int i = 0;i < 2; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+
+  /*
   printf("-------- after init ------\n");
   print_function_simple(Q);
   printf("------- after --------\n");
@@ -155,23 +197,31 @@ int main() {
   
 
   for(int i = 0; i < thread_count; ++i) {
+    if(i > 15) {
     pthread_create(&threads[i], NULL, insertion, Q);
+    } else {
+      pthread_create(&threads[i], NULL, deletion, Q);
+    }
+    
   }
 
   for(int i = 0;i < thread_count; ++i) {
     pthread_join(threads[i], NULL);
   }
 
-  // print_function(Q);
 
-  enqueue(Q, 42);
-  enqueue(Q, 43);
+  int res1 = enqueue(Q, 42);
+  //  print_function(Q);
+
+  int res2 = 123;//enqueue(Q, 43);
   int ret1 = dequeue(Q);
   int ret2 = dequeue(Q);
+  printf("res1: %d, res2: %d\n", res1, res2);
   printf("ret1: %d, ret2: %d\n", ret1, ret2);
 
-  
 
+  
+  */
   return 1;
 
 
